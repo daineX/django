@@ -426,7 +426,7 @@ class URLNode(Node):
         self.asvar = asvar
 
     def render(self, context):
-        from django.core.urlresolvers import reverse, NoReverseMatch
+        from django.urls import reverse, NoReverseMatch
         args = [arg.resolve(context) for arg in self.args]
         kwargs = {
             smart_text(k, 'ascii'): v.resolve(context)
@@ -681,7 +681,7 @@ def do_filter(parser, token):
 @register.tag
 def firstof(parser, token):
     """
-    Outputs the first variable passed that is not False, without escaping.
+    Outputs the first variable passed that is not False.
 
     Outputs nothing if all the passed variables are False.
 
@@ -692,11 +692,11 @@ def firstof(parser, token):
     This is equivalent to::
 
         {% if var1 %}
-            {{ var1|safe }}
+            {{ var1 }}
         {% elif var2 %}
-            {{ var2|safe }}
+            {{ var2 }}
         {% elif var3 %}
-            {{ var3|safe }}
+            {{ var3 }}
         {% endif %}
 
     but obviously much cleaner!
@@ -764,7 +764,7 @@ def do_for(parser, token):
     than -- the following::
 
         <ul>
-          {% if althete_list %}
+          {% if athlete_list %}
             {% for athlete in athlete_list %}
               <li>{{ athlete.name }}</li>
             {% endfor %}
@@ -969,7 +969,8 @@ def do_if(parser, token):
         token = parser.next_token()
 
     # {% endif %}
-    assert token.contents == 'endif'
+    if token.contents != 'endif':
+        raise TemplateSyntaxError('Malformed template tag at line {0}: "{1}"'.format(token.lineno, token.contents))
 
     return IfNode(conditions_nodelists)
 

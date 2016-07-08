@@ -1,6 +1,6 @@
 """
 SQL functions reference lists:
-http://www.gaia-gis.it/spatialite-3.0.0-BETA/spatialite-sql-3.0.0.html
+https://web.archive.org/web/20130407175746/http://www.gaia-gis.it/gaia-sins/spatialite-sql-4.0.0.html
 http://www.gaia-gis.it/gaia-sins/spatialite-sql-4.2.1.html
 """
 import re
@@ -25,7 +25,6 @@ class SpatiaLiteOperations(BaseSpatialOperations, DatabaseOperations):
     version_regex = re.compile(r'^(?P<major>\d)\.(?P<minor1>\d)\.(?P<minor2>\d+)')
 
     Adapter = SpatiaLiteAdapter
-    Adaptor = Adapter  # Backwards-compatibility alias.
 
     area = 'Area'
     centroid = 'Centroid'
@@ -40,6 +39,7 @@ class SpatiaLiteOperations(BaseSpatialOperations, DatabaseOperations):
     intersection = 'Intersection'
     kml = 'AsKML'
     length = 'GLength'  # OpenGis defines Length, but this conflicts with an SQLite reserved keyword
+    makeline = 'MakeLine'
     num_geom = 'NumGeometries'
     num_points = 'NumPoints'
     point_on_surface = 'PointOnSurface'
@@ -81,23 +81,23 @@ class SpatiaLiteOperations(BaseSpatialOperations, DatabaseOperations):
         'distance_lte': SpatialOperator(func='Distance', op='<='),
     }
 
+    disallowed_aggregates = (aggregates.Extent3D,)
+
     @cached_property
     def function_names(self):
         return {
             'Length': 'ST_Length',
             'Reverse': 'ST_Reverse',
             'Scale': 'ScaleCoords',
-            'Translate': 'ST_Translate' if self.spatial_version >= (3, 1, 0) else 'ShiftCoords',
+            'Translate': 'ST_Translate',
             'Union': 'ST_Union',
         }
 
     @cached_property
     def unsupported_functions(self):
-        unsupported = {'BoundingCircle', 'ForceRHR', 'GeoHash', 'MemSize'}
-        if self.spatial_version < (3, 1, 0):
-            unsupported.add('SnapToGrid')
-        if self.spatial_version < (4, 0, 0):
-            unsupported.update({'Perimeter', 'Reverse'})
+        unsupported = {'BoundingCircle', 'ForceRHR', 'IsValid', 'MakeValid', 'MemSize'}
+        if not self.lwgeom_version():
+            unsupported.add('GeoHash')
         return unsupported
 
     @cached_property
@@ -111,14 +111,9 @@ class SpatiaLiteOperations(BaseSpatialOperations, DatabaseOperations):
                 'database (error was "%s").  Was the SpatiaLite initialization '
                 'SQL loaded on this database?') % (self.connection.settings_dict['NAME'], msg)
             six.reraise(ImproperlyConfigured, ImproperlyConfigured(new_msg), sys.exc_info()[2])
-        if version < (3, 0, 0):
-            raise ImproperlyConfigured('GeoDjango only supports SpatiaLite versions 3.0.0 and above.')
+        if version < (4, 0, 0):
+            raise ImproperlyConfigured('GeoDjango only supports SpatiaLite versions 4.0.0 and above.')
         return version
-
-    @cached_property
-    def disallowed_aggregates(self):
-        disallowed = (aggregates.Extent3D, aggregates.MakeLine)
-        return disallowed
 
     def convert_extent(self, box, srid):
         """
@@ -142,7 +137,7 @@ class SpatiaLiteOperations(BaseSpatialOperations, DatabaseOperations):
 
     def geo_db_type(self, f):
         """
-        Returns None because geometry columnas are added via the
+        Returns None because geometry columns are added via the
         `AddGeometryColumn` stored procedure on SpatiaLite.
         """
         return None
@@ -214,6 +209,10 @@ class SpatiaLiteOperations(BaseSpatialOperations, DatabaseOperations):
     def proj4_version(self):
         "Returns the version of the PROJ.4 library used by SpatiaLite."
         return self._get_spatialite_func('proj4_version()')
+
+    def lwgeom_version(self):
+        """Return the version of LWGEOM library used by SpatiaLite."""
+        return self._get_spatialite_func('lwgeom_version()')
 
     def spatialite_version(self):
         "Returns the SpatiaLite library version as a string."

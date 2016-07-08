@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 
 from django.utils.version import get_version
 
-VERSION = (1, 10, 0, 'alpha', 0)
+VERSION = (1, 11, 0, 'alpha', 0)
 
 __version__ = get_version(VERSION)
 
@@ -15,7 +15,7 @@ def setup(set_prefix=True):
     """
     from django.apps import apps
     from django.conf import settings
-    from django.core.urlresolvers import set_script_prefix
+    from django.urls import set_script_prefix
     from django.utils.encoding import force_text
     from django.utils.log import configure_logging
 

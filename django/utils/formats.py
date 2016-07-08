@@ -94,7 +94,9 @@ def get_format_modules(lang=None, reverse=False):
     """
     if lang is None:
         lang = get_language()
-    modules = _format_modules_cache.setdefault(lang, list(iter_format_modules(lang, settings.FORMAT_MODULE_PATH)))
+    if lang not in _format_modules_cache:
+        _format_modules_cache[lang] = list(iter_format_modules(lang, settings.FORMAT_MODULE_PATH))
+    modules = _format_modules_cache[lang]
     if reverse:
         return list(reversed(modules))
     return modules
@@ -110,8 +112,6 @@ def get_format(format_type, lang=None, use_l10n=None):
     be localized (or not), overriding the value of settings.USE_L10N.
     """
     format_type = force_str(format_type)
-    if format_type not in FORMAT_SETTINGS:
-        return format_type
     if use_l10n or (use_l10n is None and settings.USE_L10N):
         if lang is None:
             lang = get_language()
@@ -120,9 +120,6 @@ def get_format(format_type, lang=None, use_l10n=None):
             cached = _format_cache[cache_key]
             if cached is not None:
                 return cached
-            else:
-                # Return the general setting by default
-                return getattr(settings, format_type)
         except KeyError:
             for module in get_format_modules(lang):
                 try:
@@ -137,6 +134,9 @@ def get_format(format_type, lang=None, use_l10n=None):
                 except AttributeError:
                     pass
             _format_cache[cache_key] = None
+    if format_type not in FORMAT_SETTINGS:
+        return format_type
+    # Return the general setting by default
     return getattr(settings, format_type)
 
 get_format_lazy = lazy(get_format, six.text_type, list, tuple)
@@ -214,6 +214,8 @@ def localize_input(value, default=None):
     """
     if isinstance(value, six.string_types):  # Handle strings first for performance reasons.
         return value
+    elif isinstance(value, bool):  # Don't treat booleans as numbers.
+        return six.text_type(value)
     elif isinstance(value, (decimal.Decimal, float) + six.integer_types):
         return number_format(value)
     elif isinstance(value, datetime.datetime):
